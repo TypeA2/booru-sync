@@ -1,0 +1,47 @@
+{
+    "version": 3,
+    "configurePresets": [
+        {
+            "name": "linux-base",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/${presetName}/",
+            "installDir": "${sourceDir}/${presetName}/install/",
+            "toolchainFile": "/usr/local/vcpkg/scripts/buildsystems/vcpkg.cmake",
+            "environment": {
+                "CC": "/usr/local/bin/gcc-14",
+                "CXX": "/usr/local/bin/g++-14"
+            },
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            },
+            "vendor": {
+                "microsoft.com/VisualStudioRemoteSettings/CMake/1.0": {
+                    "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}/"
+                }
+            }
+        },
+        {
+            "name": "debug",
+            "displayName": "Linux Debug",
+            "inherits": "linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "release",
+            "displayName": "Linux Release",
+            "inherits": "linux-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        }
+    ]
+}
