@@ -9,12 +9,8 @@
             "installDir": "${sourceDir}/${presetName}/install/",
             "toolchainFile": "/usr/local/vcpkg/scripts/buildsystems/vcpkg.cmake",
             "environment": {
-                "CC": "/usr/local/bin/gcc-14",
-                "CXX": "/usr/local/bin/g++-14"
-            },
-            "architecture": {
-                "value": "x64",
-                "strategy": "external"
+                "CC": "gcc-14",
+                "CXX": "g++-14"
             },
             "condition": {
                 "type": "equals",
@@ -23,7 +19,19 @@
             },
             "vendor": {
                 "microsoft.com/VisualStudioRemoteSettings/CMake/1.0": {
-                    "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}/"
+                    "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}/",
+                    "copySourcesOptions": {
+                        "exclusionList": [
+                            "vcpkg_windows",
+                            "vcpkg_linux",
+                            ".vs",
+                            ".git"
+                        ]
+                    }
+                },
+                "microsoft.com/VisualStudioSettings/CMake/1.0": {
+                    "hostOS": "Linux",
+                    "intelliSenseMode": "linux-gcc-x64"
                 }
             }
         },
@@ -41,6 +49,34 @@
             "inherits": "linux-base",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-base",
+            "hidden": true,
+            "toolchainFile": "C:/Files/vcpkg/scripts/buildsystems/vcpkg.cmake",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "installDir": "${sourceDir}/build/${presetName}/install/",
+            "architecture": {
+                "value": "x64",
+                "strategy": "external"
+            }
+        },
+        {
+            "name": "windows-debug",
+            "displayName": "Windows Debug",
+            "inherits": "windows-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "windows-release",
+            "displayName": "Windows Release",
+            "inherits": "windows-base",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
             }
         }
     ]

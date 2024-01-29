@@ -1,3 +1,6 @@
 .env
-out/
+
 .vs/
+out/
+build/
+vcpkg_*/

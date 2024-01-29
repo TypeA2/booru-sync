@@ -1,0 +1,11 @@
+{
+    "name": "booru-sync",
+    "version": "0.1",
+    "dependencies": [
+        "tclap",
+        "cpr",
+        "libpqxx",
+        "nlohmann-json",
+        "magic-enum"
+    ]
+}
