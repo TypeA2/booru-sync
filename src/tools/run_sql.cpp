@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
     try {
         util::environment env;
 
-        TCLAP::CmdLine cmd { "First-time database setup" };
+        TCLAP::CmdLine cmd { "SQL runner tool" };
 
         util::file_exists_constraint<std::filesystem::path> sql_exists { "PATH" };
         TCLAP::UnlabeledValueArg<std::filesystem::path> sql_path {
