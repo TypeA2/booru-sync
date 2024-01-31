@@ -45,5 +45,6 @@ find_package(cpr CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 find_package(magic_enum CONFIG REQUIRED)
 find_package(libpqxx CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 
 add_subdirectory("src")

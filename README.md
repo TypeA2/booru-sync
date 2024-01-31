@@ -6,5 +6,5 @@ vcpkg install
 
 # Build
 
-./build/bin/run_sql ./sql/create_tables.sql
+./build/bin/run_sql ./sql/create_tables.
 ```

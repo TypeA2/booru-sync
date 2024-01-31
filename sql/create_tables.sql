@@ -14,6 +14,11 @@ BEGIN
     END IF;
 END$$;
 
+CREATE TABLE IF NOT EXISTS metadata (
+    key TEXT PRIMARY KEY,
+    data JSONB NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS tags (
     id            INTEGER      PRIMARY KEY,
     name          TEXT         NOT NULL UNIQUE,

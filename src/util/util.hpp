@@ -8,6 +8,10 @@
 #include <ranges>
 #include <algorithm>
 #include <memory>
+#include <format>
+#include <chrono>
+
+#include <fmt/format.h>
 
 namespace util {
     namespace detail {
@@ -40,5 +44,41 @@ namespace util {
         { is >> t } -> std::convertible_to<std::istream&>;
     };
 }
+
+template <> struct std::formatter<std::chrono::nanoseconds> {
+    constexpr auto parse(format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const std::chrono::nanoseconds& ns, format_context& ctx) const {
+        if (ns < std::chrono::microseconds(1)) {
+            return std::format_to(ctx.out(), "{} ns", ns.count());
+        } else if (ns < std::chrono::milliseconds(1)) {
+            return std::format_to(ctx.out(), "{:.3f} us", ns.count() / 1e3);
+        } else if (ns < std::chrono::seconds(1)) {
+            return std::format_to(ctx.out(), "{:.3f} ms", ns.count() / 1e6);
+        }
+
+        return std::format_to(ctx.out(), "{:.3f} s", ns.count() / 1e9);
+    }
+};
+
+template <> struct fmt::formatter<std::chrono::nanoseconds> {
+    constexpr auto parse(format_parse_context& ctx) {
+        return ctx.begin();
+    }
+
+    auto format(const std::chrono::nanoseconds& ns, format_context& ctx) const {
+        if (ns < std::chrono::microseconds(1)) {
+            return std::format_to(ctx.out(), "{} ns", ns.count());
+        } else if (ns < std::chrono::milliseconds(1)) {
+            return std::format_to(ctx.out(), "{:.3f} us", ns.count() / 1e3);
+        } else if (ns < std::chrono::seconds(1)) {
+            return std::format_to(ctx.out(), "{:.3f} ms", ns.count() / 1e6);
+        }
+
+        return std::format_to(ctx.out(), "{:.3f} s", ns.count() / 1e9);
+    }
+};
 
 #endif /* UTIL_HPP */

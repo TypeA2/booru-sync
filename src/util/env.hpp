@@ -16,38 +16,37 @@
 
 namespace util {
     class environment {
-        TCLAP::ValueArg<std::filesystem::path> _arg;
-        std::filesystem::file_time_type _update_time;
+        environment() = default;
 
         public:
-        environment();
+        [[nodiscard]] static TCLAP::ValueArg<std::filesystem::path>& arg();
 
-        operator TCLAP::ValueArg<std::filesystem::path>& ();
+        /* Get string value */
+        static [[nodiscard]] std::string_view get(const std::string& key);
 
-        [[nodiscard]] std::string_view operator[](const std::string& key) const;
-
+        /* Get typed value */
         template <istream_extractable T>
-        [[nodiscard]] auto get(this const environment& self, const std::string& key) {
+        [[nodiscard]] static auto get(const std::string& key) {
             if constexpr (std::convertible_to<T, std::string_view>) {
-                return T { self[key] };
+                return T { get(key) };
             } else {
-                std::stringstream ss { std::string { self[key] } };
+                std::stringstream ss { std::string { get(key) }};
 
                 T res;
                 ss >> res;
 
                 if (!ss) {
-                    throw std::invalid_argument { std::format("Couldn't parse environ: {}={}", key, self[key]) };
+                    throw std::invalid_argument { std::format("Couldn't parse environ: {}={}", key, get(key)) };
                 }
 
                 return res;
             }
         }
 
-        [[nodiscard]] bool contains(const std::string& key) const;
+        /* Whether environ is present */
+        static [[nodiscard]] bool contains(const std::string& key);
 
-        private:
-        void _read_env();
+        static void parse();
     };
 }
 

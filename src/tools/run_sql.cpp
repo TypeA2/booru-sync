@@ -13,8 +13,6 @@
 
 int main(int argc, char** argv) {
     try {
-        util::environment env;
-
         TCLAP::CmdLine cmd { "SQL runner tool" };
 
         util::file_exists_constraint<std::filesystem::path> sql_exists { "PATH" };
@@ -24,9 +22,10 @@ int main(int argc, char** argv) {
             &sql_exists
         };
 
-        cmd.add(env);
+        cmd.add(util::environment::arg());
         cmd.add(sql_path);
         cmd.parse(argc, argv);
+        util::environment::parse();
 
         /* Load and execute SQL input file */
 

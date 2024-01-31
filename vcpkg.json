@@ -6,6 +6,7 @@
         "cpr",
         "libpqxx",
         "nlohmann-json",
-        "magic-enum"
+        "magic-enum",
+        "spdlog"
     ]
 }
