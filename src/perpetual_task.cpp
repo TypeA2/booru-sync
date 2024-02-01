@@ -18,6 +18,8 @@ void perpetual_task::start() {
 
         /* Run until a stop is requested */
         for (; !token.stop_requested();) {
+            util::log.info("[{}] Running", _id);
+
             auto begin = clock::now();
             this->execute(token);
             auto end = clock::now();
@@ -29,7 +31,7 @@ void perpetual_task::start() {
                 next_wake -= elapsed;
             }
 
-            util::log.info("Task {} finished in {}", _id, elapsed);
+            util::log.info("[{}] finished in {}, next run in {}", _id, elapsed, next_wake - clock::now());
 
             /* Sleep until next wake, or until stop requested */
             std::unique_lock lock { mut };

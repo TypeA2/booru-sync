@@ -23,6 +23,7 @@ namespace util {
 
         /* Get string value */
         static [[nodiscard]] std::string_view get(const std::string& key);
+        static [[nodiscard]] std::string_view get_or_default(const std::string& key, std::string_view def);
 
         /* Get typed value */
         template <istream_extractable T>
@@ -31,6 +32,28 @@ namespace util {
                 return T { get(key) };
             } else {
                 std::stringstream ss { std::string { get(key) }};
+
+                T res;
+                ss >> res;
+
+                if (!ss) {
+                    throw std::invalid_argument { std::format("Couldn't parse environ: {}={}", key, get(key)) };
+                }
+
+                return res;
+            }
+        }
+
+        template <istream_extractable T>
+        [[nodiscard]] static auto get_or_default(const std::string& key, const T& def) {
+            if (!contains(key)) {
+                return def;
+            }
+
+            if constexpr (std::convertible_to<T, std::string_view>) {
+                return T { get(key) };
+            } else {
+                std::stringstream ss { std::string { get(key) } };
 
                 T res;
                 ss >> res;

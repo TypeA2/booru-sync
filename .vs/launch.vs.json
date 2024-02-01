@@ -1,0 +1,13 @@
+{
+    "version": "0.2.1",
+    "defaults": {},
+    "configurations": [
+        {
+            "type": "default",
+            "project": "CMakeLists.txt",
+            "projectTarget": "booru_sync.exe (bin\\booru_sync.exe)",
+            "name": "debug booru_sync",
+            "currentDir": "${workspaceRoot}"
+        }
+    ]
+}

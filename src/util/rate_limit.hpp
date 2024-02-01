@@ -25,6 +25,9 @@ namespace util {
         explicit rate_limit(size_t bucket_size, duration refill_delay);
 
         void acquire();
+
+        [[nodiscard]] size_t bucket_size() const;
+        [[nodiscard]] duration refill_delay() const;
     };
 }
 

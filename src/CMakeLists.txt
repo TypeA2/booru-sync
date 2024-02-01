@@ -6,8 +6,10 @@ add_subdirectory("tools")
 add_executable(booru_sync
     "booru_sync.cpp"
     "perpetual_task.hpp" "perpetual_task.cpp"
+    "danbooru.hpp" "danbooru.cpp"
+    "database.hpp" "database.cpp"
     "tasks/fetch_tags.hpp" "tasks/fetch_tags.cpp"
-)
+ )
 
 setup_target(TARGET booru_sync LIBRARIES
     util

@@ -12,6 +12,9 @@
 #include <env.hpp>
 #include <logging.hpp>
 
+#include "danbooru.hpp"
+#include "database.hpp"
+
 #include "tasks/fetch_tags.hpp"
 
 static std::atomic_flag signal_flag = ATOMIC_FLAG_INIT;
@@ -39,10 +42,14 @@ int main(int argc, char** argv) {
             return EXIT_FAILURE;
         }
 
-        util::rate_limit rl { 10, std::chrono::seconds(1) };
+        danbooru booru;
+        database db;
 
         std::array<std::unique_ptr<perpetual_task>, 1> tasks {
-            std::make_unique<tasks::fetch_tags>("fetch_tags", std::chrono::seconds(10), perpetual_task::timing_mode::per_invocation, rl)
+            std::make_unique<tasks::fetch_tags>(
+                "fetch_tags", std::chrono::seconds(10), perpetual_task::timing_mode::per_invocation,
+                booru, db
+            ),
         };
 
         std::signal(SIGINT, signal_handler);

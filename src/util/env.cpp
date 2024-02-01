@@ -66,6 +66,16 @@ std::string_view util::environment::get(const std::string& key) {
     throw std::out_of_range { std::format("environ not found: {}", key) };
 }
 
+std::string_view util::environment::get_or_default(const std::string& key, std::string_view def) {
+    detail::read_env();
+
+    if (const char* val = std::getenv(key.c_str())) {
+        return val;
+    }
+
+    return def;
+}
+
 bool util::environment::contains(const std::string& key) {
     detail::read_env();
     return std::getenv(key.c_str()) != 0;

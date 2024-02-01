@@ -1,7 +1,9 @@
 .env
 *.log
 
-.vs/
+.vs/*
 out/
 build/
 vcpkg_*/
+
+!.vs/launch.vs.json

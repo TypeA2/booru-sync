@@ -21,3 +21,11 @@ void util::rate_limit::acquire() {
         _bucket -= 1;
     }
 }
+
+size_t util::rate_limit::bucket_size() const {
+    return _bucket_size;
+}
+
+util::rate_limit::duration util::rate_limit::refill_delay() const {
+    return _refill_delay;
+}
