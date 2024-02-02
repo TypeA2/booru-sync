@@ -2,11 +2,26 @@
 #include "danbooru.hpp"
 
 #include <sstream>
+#include <chrono>
+#include <ranges>
+#include <algorithm>
 
 #include <magic_enum.hpp>
 
 #include <env.hpp>
 #include <logging.hpp>
+
+danbooru::tag danbooru::tag::parse(json& json) {
+    return tag{
+        .id = json["id"],
+        .name = json["name"],
+        .post_count = json["post_count"],
+        .category = *magic_enum::enum_cast<tag_category>(json["category"].get<uint8_t>()),
+        .is_deprecated = json["is_deprecated"],
+        .created_at = parse_timestamp(json["created_at"].get<std::string_view>()),
+        .updated_at = parse_timestamp(json["updated_at"].get<std::string_view>()),
+    };
+}
 
 std::string danbooru::page_selector::str() const {
     std::stringstream ss;
@@ -35,6 +50,16 @@ danbooru::page_selector danbooru::page_selector::before(uint32_t value) {
 
 danbooru::page_selector danbooru::page_selector::after(uint32_t value) {
     return { .pos = page_pos::after, .value = value };
+}
+
+danbooru::timestamp danbooru::parse_timestamp(std::string_view ts) {
+    std::string date{ ts };
+
+    std::stringstream ss{ date };
+    timestamp res;
+    ss >> std::chrono::parse("%FT%T%Ez", res);
+
+    return res;
 }
 
 danbooru::danbooru()
@@ -79,6 +104,13 @@ std::span<danbooru::tag> danbooru::tags(std::vector<tag>& tags, page_selector pa
     }
 
     auto response = get("tags", { page.param(), { "limit", std::to_string(limit) } });
+
+    tags.clear();
+    tags.reserve(limit);
+
+    std::ranges::transform(response, std::back_inserter(tags), tag::parse);
+
+    return tags;
 }
 
 danbooru::json danbooru::get(std::string_view url, cpr::Parameter param) {

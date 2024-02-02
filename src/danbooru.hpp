@@ -17,6 +17,8 @@ class danbooru {
     std::string _user_agent;
 
     public:
+    using json = nlohmann::json;
+
     static constexpr size_t post_limit = 200;
     static constexpr size_t page_limit = 1000;
     using timestamp = std::chrono::utc_clock::time_point;
@@ -36,7 +38,7 @@ class danbooru {
         e,
     };
 
-    enum class category : uint8_t {
+    enum class pool_category : uint8_t {
         series,
         collection,
     };
@@ -49,6 +51,8 @@ class danbooru {
         bool is_deprecated;
         timestamp created_at;
         timestamp updated_at;
+
+        [[nodiscard]] static tag parse(json& json);
     };
 
     enum class page_pos {
@@ -62,12 +66,14 @@ class danbooru {
         uint32_t value;
 
         [[nodiscard]] std::string str() const;
-        [[nodisacrd]] cpr::Parameter param() const;
+        [[nodiscard]] cpr::Parameter param() const;
 
         [[nodiscard]] static page_selector at(uint32_t value);
         [[nodiscard]] static page_selector before(uint32_t value);
         [[nodiscard]] static page_selector after(uint32_t value);
     };
+
+    [[nodiscard]] static timestamp parse_timestamp(std::string_view ts);
 
     danbooru();
 
@@ -77,8 +83,6 @@ class danbooru {
 
     private:
     std::vector<tag> _tags;
-
-    using json = nlohmann::json;
 
     [[nodiscard]] json get(std::string_view url, cpr::Parameter param);
     [[nodiscard]] json get(std::string_view url, cpr::Parameters params = {});

@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
 
         std::array<std::unique_ptr<perpetual_task>, 1> tasks {
             std::make_unique<tasks::fetch_tags>(
-                "fetch_tags", std::chrono::seconds(10), perpetual_task::timing_mode::per_invocation,
+                "fetch_tags", std::chrono::minutes(5), perpetual_task::timing_mode::per_invocation,
                 booru, db
             ),
         };
