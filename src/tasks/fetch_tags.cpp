@@ -10,10 +10,8 @@
 
 void tasks::fetch_tags::execute(std::stop_token token, danbooru& booru, database& db) {
     auto tx = db.work();
-
     auto latest_id = tx.query_value<int32_t>("SELECT COALESCE(MAX(id), 0) FROM tags");
-
-    util::log.info("Latest tag ID: {}", latest_id);
-
     tx.commit();
+
+
 }

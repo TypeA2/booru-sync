@@ -17,9 +17,67 @@ class danbooru {
     std::string _user_agent;
 
     public:
+    static constexpr size_t post_limit = 200;
+    static constexpr size_t page_limit = 1000;
+    using timestamp = std::chrono::utc_clock::time_point;
+
+    enum class tag_category : uint8_t {
+        general = 0,
+        artist = 1,
+        copyright = 3,
+        character = 4,
+        meta = 5,
+    };
+
+    enum class post_rating : uint8_t {
+        g,
+        s,
+        q,
+        e,
+    };
+
+    enum class category : uint8_t {
+        series,
+        collection,
+    };
+
+    struct tag {
+        int32_t id;
+        std::string name;
+        int32_t post_count;
+        tag_category category;
+        bool is_deprecated;
+        timestamp created_at;
+        timestamp updated_at;
+    };
+
+    enum class page_pos {
+        absolute,
+        before,
+        after,
+    };
+
+    struct page_selector {
+        page_pos pos;
+        uint32_t value;
+
+        [[nodiscard]] std::string str() const;
+        [[nodisacrd]] cpr::Parameter param() const;
+
+        [[nodiscard]] static page_selector at(uint32_t value);
+        [[nodiscard]] static page_selector before(uint32_t value);
+        [[nodiscard]] static page_selector after(uint32_t value);
+    };
+
     danbooru();
 
+    [[nodiscard]] std::span<tag> tags(page_selector page, size_t limit = page_limit);
+    std::span<tag> tags(std::vector<tag>& tags, page_selector page, size_t limit = page_limit);
+
+
     private:
+    std::vector<tag> _tags;
+
     using json = nlohmann::json;
 
     [[nodiscard]] json get(std::string_view url, cpr::Parameter param);
