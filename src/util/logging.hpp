@@ -4,12 +4,8 @@
 
 #include <spdlog/spdlog.h>
 
-namespace util {
-    namespace detail {
-        [[nodiscard]] spdlog::logger make_logger();
-    }
-
-    static spdlog::logger log = detail::make_logger();
+namespace util::logging {
+    void setup();
 }
 
 #endif /* LOGGING_HPP */

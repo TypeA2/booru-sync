@@ -11,7 +11,9 @@
 #include <env.hpp>
 #include <logging.hpp>
 
-danbooru::tag danbooru::tag::parse(json& json) {
+using namespace danbooru;
+
+tag tag::parse(json& json) {
     return tag{
         .id = json["id"],
         .name = json["name"],
@@ -23,7 +25,7 @@ danbooru::tag danbooru::tag::parse(json& json) {
     };
 }
 
-std::string danbooru::page_selector::str() const {
+std::string page_selector::str() const {
     std::stringstream ss;
 
     switch (pos) {
@@ -36,23 +38,23 @@ std::string danbooru::page_selector::str() const {
     return ss.str();
 }
 
-cpr::Parameter danbooru::page_selector::param() const {
+cpr::Parameter page_selector::param() const {
     return { "page", str() };
 }
 
-danbooru::page_selector danbooru::page_selector::at(uint32_t value) {
+page_selector page_selector::at(uint32_t value) {
     return { .pos = page_pos::absolute, .value = value };
 }
 
-danbooru::page_selector danbooru::page_selector::before(uint32_t value) {
+page_selector page_selector::before(uint32_t value) {
     return { .pos = page_pos::before, .value = value };
 }
 
-danbooru::page_selector danbooru::page_selector::after(uint32_t value) {
+page_selector page_selector::after(uint32_t value) {
     return { .pos = page_pos::after, .value = value };
 }
 
-danbooru::timestamp danbooru::parse_timestamp(std::string_view ts) {
+timestamp danbooru::parse_timestamp(std::string_view ts) {
     std::string date{ ts };
 
     std::stringstream ss{ date };
@@ -62,7 +64,11 @@ danbooru::timestamp danbooru::parse_timestamp(std::string_view ts) {
     return res;
 }
 
-danbooru::danbooru()
+std::string danbooru::format_timestamp(timestamp time) {
+    return std::format(timestamp_format, std::chrono::time_point_cast<std::chrono::milliseconds>(time));
+}
+
+api::api()
     : _rl {
         util::environment::get_or_default<uint64_t>("DANBOORU_RATE_LIMIT", 10),
         std::chrono::seconds(1)
@@ -74,10 +80,10 @@ danbooru::danbooru()
     }
     , _user_agent { std::format("hoshino.bot user {}", util::environment::get<std::string>("DANBOORU_LOGIN")) } {
 
-    util::log.info("Rate limit: {} / s", _rl.bucket_size());
+    spdlog::info("Rate limit: {} / s", _rl.bucket_size());
 
     /* Verify login */
-    auto res = get("profile", { "only", "id,name" });
+    auto res = get("profile", { "only", "id,name,level" });
 
     if (!res.contains("id") || !res.contains("name")) {
         throw std::runtime_error { std::format("Failed to get user info: {}", res.dump())};
@@ -85,39 +91,34 @@ danbooru::danbooru()
 
     _user_id = res["id"];
     _user_name = res["name"];
+    _level = *magic_enum::enum_cast<user_level>(res["level"].get<int32_t>());
 
     /* Be nice to evazion, tell him who we are */
     _user_agent = std::format("{} (#{})", _user_agent, _user_id);
 
-    util::log.info("Logging in as {} (user #{})", _user_id, _user_id);
-
-    _tags.reserve(page_limit);
+    spdlog::info("Logging in as {} (user #{}), level: {}", _user_id, _user_id, magic_enum::enum_name(_level));
 }
 
-std::span<danbooru::tag> danbooru::tags(page_selector page, size_t limit) {
-    return tags(_tags, page, limit);
-}
-
-std::span<danbooru::tag> danbooru::tags(std::vector<tag>& tags, page_selector page, size_t limit) {
+std::span<tag> api::tags(std::vector<tag>& storage, page_selector page, size_t limit) {
     if (limit > page_limit) {
         throw std::invalid_argument { std::format("limit of {} is too large (max: {})", limit, page_limit) };
     }
 
     auto response = get("tags", { page.param(), { "limit", std::to_string(limit) } });
 
-    tags.clear();
-    tags.reserve(limit);
+    storage.clear();
+    storage.reserve(limit);
 
-    std::ranges::transform(response, std::back_inserter(tags), tag::parse);
+    std::ranges::transform(response, std::back_inserter(storage), tag::parse);
 
-    return tags;
+    return storage;
 }
 
-danbooru::json danbooru::get(std::string_view url, cpr::Parameter param) {
+json api::get(std::string_view url, cpr::Parameter param) {
     return get(url, cpr::Parameters { param });
 }
 
-danbooru::json danbooru::get(std::string_view url, cpr::Parameters params) {
+json api::get(std::string_view url, cpr::Parameters params) {
     cpr::Session ses;
     ses.SetAuth(_auth);
     ses.SetUrl(std::format("https://danbooru.donmai.us/{}.json", url));
@@ -126,6 +127,8 @@ danbooru::json danbooru::get(std::string_view url, cpr::Parameters params) {
 
     _rl.acquire();
     auto res = ses.Get();
+
+    spdlog::trace("GET - {}", ses.GetFullRequestUrl());
 
     if (res.status_code >= 400) {
         throw std::runtime_error { std::format("GET {} - {}", res.status_code, ses.GetFullRequestUrl()) };

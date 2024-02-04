@@ -7,16 +7,7 @@
 
 #include <rate_limit.hpp>
 
-class danbooru {
-    util::rate_limit _rl;
-
-    cpr::Authentication _auth;
-    int32_t _user_id;
-    std::string _user_name;
-
-    std::string _user_agent;
-
-    public:
+namespace danbooru {
     using json = nlohmann::json;
 
     static constexpr size_t post_limit = 200;
@@ -41,6 +32,20 @@ class danbooru {
     enum class pool_category : uint8_t {
         series,
         collection,
+    };
+
+    enum class user_level : uint8_t {
+        anonymous   =  0,
+        restricted  = 10,
+        member      = 20,
+        gold        = 30,
+        platinum    = 31,
+        builder     = 32,
+        contributor = 35,
+        approver    = 37,
+        moderator   = 40,
+        admin       = 50,
+        owner       = 60,
     };
 
     struct tag {
@@ -73,19 +78,33 @@ class danbooru {
         [[nodiscard]] static page_selector after(uint32_t value);
     };
 
-    [[nodiscard]] static timestamp parse_timestamp(std::string_view ts);
+    static constexpr char timestamp_format[] = "{:%FT%T%Ez}";
+    static constexpr size_t timestamp_length = 30;
 
-    danbooru();
+    [[nodiscard]] timestamp parse_timestamp(std::string_view ts);
+    [[nodiscard]] std::string format_timestamp(timestamp time);
 
-    [[nodiscard]] std::span<tag> tags(page_selector page, size_t limit = page_limit);
-    std::span<tag> tags(std::vector<tag>& tags, page_selector page, size_t limit = page_limit);
+    class api {
+        util::rate_limit _rl;
 
+        cpr::Authentication _auth;
+        int32_t _user_id;
+        std::string _user_name;
+        user_level _level;
 
-    private:
-    std::vector<tag> _tags;
+        std::string _user_agent;
 
-    [[nodiscard]] json get(std::string_view url, cpr::Parameter param);
-    [[nodiscard]] json get(std::string_view url, cpr::Parameters params = {});
-};
+        public:
+
+        api();
+
+        /* Callee must provide storage to ensure reentrancy */
+        std::span<tag> tags(std::vector<tag>& storage, page_selector page, size_t limit = page_limit);
+
+        private:
+        [[nodiscard]] json get(std::string_view url, cpr::Parameter param);
+        [[nodiscard]] json get(std::string_view url, cpr::Parameters params = {});
+    };
+}
 
 #endif /* DANBOORU_HPP */

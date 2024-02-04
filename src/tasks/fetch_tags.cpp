@@ -8,16 +8,27 @@
 #include "danbooru.hpp"
 #include "database.hpp"
 
-void tasks::fetch_tags::execute(std::stop_token token, danbooru& booru, database& db) {
-    auto tx = db.work();
-    auto latest_id = tx.query_value<int32_t>("SELECT COALESCE(MAX(id), 0) FROM tags");
-    tx.commit();
+using namespace danbooru;
+using namespace database;
 
-    util::log.info("Fetching from tag #{}", latest_id);
+void tasks::fetch_tags::execute(std::stop_token token, api& booru, instance& db) {
+    tags& table = db.tags();
 
-    std::span<danbooru::tag> tags = booru.tags(danbooru::page_selector::after(latest_id), 5);
+    int32_t latest_id = table.last();
 
-    for (const auto& t : tags) {
-        util::log.info("tag #{}: {}", t.id, t.name);
+    spdlog::info("Fetching from tag #{}", latest_id);
+
+    while (!token.stop_requested()) {
+        booru.tags(_tags, page_selector::after(latest_id), page_limit);
+
+        if (_tags.empty()) {
+            break;
+        }
+
+        table.insert(_tags);
+
+        latest_id = _tags.front().id;
+
+        spdlog::debug("Last tag: {}", latest_id);
     }
 }

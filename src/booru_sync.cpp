@@ -29,6 +29,10 @@ int main(int argc, char** argv) {
         TCLAP::CmdLine cmd { "Fetch tag records from server" };
 
         cmd.add(util::environment::arg());
+
+        TCLAP::MultiSwitchArg verbose { "v", "verbose", "Verbose output" };
+        cmd.add(verbose);
+
         cmd.parse(argc, argv);
         util::environment::parse();
 
@@ -42,8 +46,19 @@ int main(int argc, char** argv) {
             return EXIT_FAILURE;
         }
 
-        danbooru booru;
-        database db;
+        util::logging::setup();
+
+        spdlog::info("Verbose output: {}", verbose.getValue() ? "true" : "false");
+        if (int verbosity = verbose.getValue()) {
+            if (verbosity == 1) {
+                spdlog::set_level(spdlog::level::debug);
+            } else {
+                spdlog::set_level(spdlog::level::trace);
+            }
+        }
+
+        danbooru::api booru;
+        database::instance db;
 
         std::array<std::unique_ptr<perpetual_task>, 1> tasks {
             std::make_unique<tasks::fetch_tags>(
@@ -61,7 +76,7 @@ int main(int argc, char** argv) {
 
         signal_flag.wait(false);
 
-        util::log.info("Signal received, closing tasks");
+        spdlog::info("Signal received, closing tasks");
 
         for (const auto& task : tasks) {
             task->request_stop();
@@ -72,7 +87,7 @@ int main(int argc, char** argv) {
         }
 
     } catch (const std::exception& e) {
-        std::println(std::cerr, "Exception: {}", e.what());
+        spdlog::error("Exception: {}", e.what());
         return EXIT_FAILURE;
     }
 }
