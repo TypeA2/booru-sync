@@ -43,6 +43,43 @@ namespace util {
     concept istream_extractable = requires (T t, std::istream & is) {
         { is >> t } -> std::convertible_to<std::istream&>;
     };
+
+    template <typename Clock = std::chrono::steady_clock>
+    struct timer {
+        using clock = Clock;
+        using rep = clock::rep;
+        using period = clock::period;
+        using duration = clock::duration;
+        using time_point = clock::time_point;
+
+        time_point start;
+
+        timer() : start { clock::now() } { }
+
+        duration elapsed() {
+            return clock::now() - start;
+        }
+
+        duration elapsed(time_point since) {
+            return clock::now() - since;
+        }
+
+        duration elapsed_reset() {
+            auto res = elapsed();
+            reset();
+            return res;
+        }
+
+        auto average(size_t n) {
+            auto total = elapsed();
+
+            return total / n;
+        }
+
+        void reset() {
+            start = clock::now();
+        }
+    };
 }
 
 template <> struct std::formatter<std::chrono::nanoseconds> {

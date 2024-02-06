@@ -9,7 +9,6 @@
 #include <magic_enum.hpp>
 
 #include <env.hpp>
-#include <logging.hpp>
 
 using namespace danbooru;
 
@@ -83,7 +82,7 @@ api::api()
     spdlog::info("Rate limit: {} / s", _rl.bucket_size());
 
     /* Verify login */
-    auto res = get("profile", { "only", "id,name,level" });
+    auto res = get("profile", { "only", "id,name,level" }).get();
 
     if (!res.contains("id") || !res.contains("name")) {
         throw std::runtime_error { std::format("Failed to get user info: {}", res.dump())};
@@ -99,40 +98,17 @@ api::api()
     spdlog::info("Logging in as {} (user #{}), level: {}", _user_id, _user_id, magic_enum::enum_name(_level));
 }
 
-std::span<tag> api::tags(std::vector<tag>& storage, page_selector page, size_t limit) {
+std::future<std::vector<tag>> api::tags(page_selector page, size_t limit) {
     if (limit > page_limit) {
         throw std::invalid_argument { std::format("limit of {} is too large (max: {})", limit, page_limit) };
     }
 
-    auto response = get("tags", { page.param(), { "limit", std::to_string(limit) } });
-
-    storage.clear();
-    storage.reserve(limit);
-
-    std::ranges::transform(response, std::back_inserter(storage), tag::parse);
-
-    return storage;
+    return get<std::vector<tag>>("tags", { page.param(), { "limit", std::to_string(limit) } },
+        [](json response) -> std::vector<tag> {
+            return response | std::views::transform(tag::parse) | std::ranges::to<std::vector>();
+    });
 }
 
-json api::get(std::string_view url, cpr::Parameter param) {
+std::future<json> api::get(std::string_view url, cpr::Parameter param) {
     return get(url, cpr::Parameters { param });
-}
-
-json api::get(std::string_view url, cpr::Parameters params) {
-    cpr::Session ses;
-    ses.SetAuth(_auth);
-    ses.SetUrl(std::format("https://danbooru.donmai.us/{}.json", url));
-    ses.SetParameters(params);
-    ses.SetUserAgent(_user_agent);
-
-    _rl.acquire();
-    auto res = ses.Get();
-
-    spdlog::trace("GET - {}", ses.GetFullRequestUrl());
-
-    if (res.status_code >= 400) {
-        throw std::runtime_error { std::format("GET {} - {}", res.status_code, ses.GetFullRequestUrl()) };
-    }
-
-    return json::parse(res.text);
 }

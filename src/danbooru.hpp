@@ -4,6 +4,7 @@
 
 #include <cpr/cpr.h>
 #include <nlohmann/json.hpp>
+#include <logging.hpp>
 
 #include <rate_limit.hpp>
 
@@ -84,6 +85,11 @@ namespace danbooru {
     [[nodiscard]] timestamp parse_timestamp(std::string_view ts);
     [[nodiscard]] std::string format_timestamp(timestamp time);
 
+    template <typename T, typename Func>
+    concept transform_func = requires (Func func, json args) {
+        { func(args) } -> std::convertible_to<T>;
+    };
+
     class api {
         util::rate_limit _rl;
 
@@ -98,12 +104,33 @@ namespace danbooru {
 
         api();
 
-        /* Callee must provide storage to ensure reentrancy */
-        std::span<tag> tags(std::vector<tag>& storage, page_selector page, size_t limit = page_limit);
+        std::future<std::vector<tag>> tags(page_selector page, size_t limit = page_limit);
 
         private:
-        [[nodiscard]] json get(std::string_view url, cpr::Parameter param);
-        [[nodiscard]] json get(std::string_view url, cpr::Parameters params = {});
+        [[nodiscard]] std::future<json> get(std::string_view url, cpr::Parameter param);
+
+        template <typename T = json, typename Func = std::identity> requires transform_func<T, Func>
+        [[nodiscard]] std::future<T> get(std::string_view url, cpr::Parameters params = {}, Func func = {}) {
+            return std::async([this, params = std::move(params), func = std::move(func)](const cpr::Url& url) -> T {
+                auto ses = std::make_shared<cpr::Session>();
+                ses->SetAuth(_auth);
+                ses->SetUrl(url);
+                ses->SetParameters(params);
+                ses->SetUserAgent(_user_agent);
+
+                _rl.acquire();
+
+                auto res = ses->Get();
+
+                spdlog::trace("GET - {}", ses->GetFullRequestUrl());
+
+                if (res.status_code >= 400) {
+                    throw std::runtime_error { std::format("GET {} - {}", res.status_code, ses->GetFullRequestUrl()) };
+                }
+
+                return func(json::parse(res.text));
+            }, std::format("https://danbooru.donmai.us/{}.json", url));
+        }
     };
 }
 

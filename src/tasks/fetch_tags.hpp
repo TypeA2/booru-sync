@@ -7,14 +7,12 @@
 #include "database.hpp"
 
 namespace tasks {
-    class fetch_tags : public shared_resource_task<danbooru::api&, database::instance&> {
-        std::vector<danbooru::tag> _tags;
-
+    class fetch_tags : public shared_resource_task<danbooru::api&, store_invoke_resource<database::connection>> {
         public:
         using shared_resource_task::shared_resource_task;
 
         protected:
-        void execute(std::stop_token token, danbooru::api& booru, database::instance& db) override;
+        void execute(std::stop_token token, danbooru::api& booru, database::connection& db) override;
     };
 }
 

@@ -37,63 +37,71 @@ namespace pqxx {
     }
 }
 
-table::table(instance& inst) : inst { inst } { }
-
-tags::tags(instance& inst) : table { inst } {
-    inst->prepare("tags_insert", "INSERT INTO tags VALUES ($1, $2, $3, $4, $5, $6, $7)");
-}
+table::table(connection& inst) : inst { inst } { }
 
 int32_t tags::last() {
-    auto lock = inst.lock();
-
     auto tx = inst.work();
     int32_t res = tx.query_value<int32_t>("SELECT COALESCE(MAX(id), 0) FROM tags");
     tx.commit();
     return res;
 }
 
-void tags::insert(const danbooru::tag& tag) {
-    auto lock = inst.lock();
+int32_t tags::insert(const danbooru::tag& tag) {
     auto tx = inst.work();
 
     tx.exec_prepared("tags_insert",
         tag.id, tag.name, tag.post_count, tag.category, tag.is_deprecated, tag.created_at, tag.updated_at);
     tx.commit();
+
+    return tag.id;
 }
 
-void tags::insert(std::span<const danbooru::tag> tags) {
-    auto lock = inst.lock();
+int32_t tags::insert(std::span<const danbooru::tag> tags) {
+    int32_t max_id = 0;
     auto tx = inst.work();
 
     for (const danbooru::tag& tag : tags) {
+        if (tag.id > max_id) {
+            max_id = tag.id;
+        }
+
         tx.exec_prepared("tags_insert",
             tag.id, tag.name, tag.post_count, tag.category, tag.is_deprecated, tag.created_at, tag.updated_at);
     }
 
     tx.commit();
+
+    return max_id;
 }
 
-pqxx::work instance::work() {
+pqxx::work connection::work() {
     return pqxx::work { _conn };
 }
 
-std::unique_lock<std::mutex> instance::lock() {
-    return std::unique_lock { _mut };
+connection::connection() {
+    spdlog::debug("Connected to {} as {}", _conn.dbname(), _conn.username());
+
+    _conn.prepare("tags_insert", "INSERT INTO tags VALUES ($1, $2, $3, $4, $5, $6, $7)");
 }
 
-instance::instance()
-    : _tags { *this } {
-
+connection::~connection() {
+    if (_conn.is_open()) {
+        spdlog::debug("Disconnecting from {}", _conn.dbname());
+    }
 }
 
-instance::operator pqxx::connection& () {
+connection::operator pqxx::connection& () {
     return _conn;
 }
 
-pqxx::connection* instance::operator->() {
+pqxx::connection* connection::operator->() {
     return &_conn;
 }
 
-tags& instance::tags() {
-    return _tags;
+pqxx::connection& connection::conn() {
+    return _conn;
+}
+
+tags connection::tags() {
+    return database::tags { *this };
 }

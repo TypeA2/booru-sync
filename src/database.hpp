@@ -81,46 +81,66 @@ namespace pqxx {
 }
 
 namespace database {
-    class instance;
+    class connection;
 
     class table {
-        friend class instance;
+        friend class connection;
+
+        public:
+        virtual ~table() = default;
+
+        table(const table&) = delete;
+        table& operator=(const table&) = delete;
+
+        table(table&&) noexcept = default;
+        table& operator=(table&&) noexcept = default;
 
         protected:
-        explicit table(instance& inst);
+        explicit table(connection& inst);
 
-        instance& inst;
+        connection& inst;
     };
 
     class tags : table {
-        friend class instance;
+        friend class connection;
 
         protected:
-        explicit tags(instance& inst);
+        using table::table;
 
         public:
         [[nodiscard]] int32_t last();
 
-        void insert(const danbooru::tag& tag);
-        void insert(std::span<const danbooru::tag> tag);
+        tags(const tags&) = delete;
+        tags& operator=(const tags&) = delete;
+
+        tags(tags&&) noexcept = default;
+        tags& operator=(tags&&) noexcept = default;
+
+        int32_t insert(const danbooru::tag& tag);
+        int32_t insert(std::span<const danbooru::tag> tag);
     };
 
-    class instance {
-        std::mutex _mut;
+    class connection {
         pqxx::connection _conn;
-        tags _tags;
 
         public:
-        instance();
+        connection();
+        ~connection();
+
+        connection(const connection&) = delete;
+        connection& operator=(const connection&) = delete;
+
+        connection(connection&&) noexcept = default;
+        connection& operator=(connection&&) noexcept = default;
 
         /* Behave like a pqxx::connection */
         operator pqxx::connection& ();
         pqxx::connection* operator->();
+        pqxx::connection& conn();
 
         [[nodiscard]] pqxx::work work();
-        [[nodiscard]] std::unique_lock<std::mutex> lock();
 
-        [[nodiscard]] tags& tags();
+        [[nodiscard]] tags tags();
     };
 }
 

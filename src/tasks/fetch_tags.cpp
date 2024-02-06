@@ -2,8 +2,10 @@
 #include "fetch_tags.hpp"
 
 #include <array>
+#include <chrono>
 
 #include <logging.hpp>
+#include <util.hpp>
 
 #include "danbooru.hpp"
 #include "database.hpp"
@@ -11,24 +13,34 @@
 using namespace danbooru;
 using namespace database;
 
-void tasks::fetch_tags::execute(std::stop_token token, api& booru, instance& db) {
-    tags& table = db.tags();
-
+void tasks::fetch_tags::execute(std::stop_token token, api& booru, connection& db) {
+    tags table = db.tags();
     int32_t latest_id = table.last();
 
     spdlog::info("Fetching from tag #{}", latest_id);
 
     while (!token.stop_requested()) {
-        booru.tags(_tags, page_selector::after(latest_id), page_limit);
+        util::timer timer;
+        auto res = booru.tags(page_selector::after(latest_id), page_limit).get();
 
-        if (_tags.empty()) {
+        auto fetch = timer.elapsed_reset();
+
+        if (res.empty()) {
             break;
         }
 
-        table.insert(_tags);
+        latest_id = res.front().id;
 
-        latest_id = _tags.front().id;
+        for (auto& tag : res) {
+            tag.post_count = 0;
+        }
 
-        spdlog::debug("Last tag: {}", latest_id);
+        auto modify = timer.elapsed_reset();
+
+        table.insert(res);
+
+        auto insert = timer.elapsed_reset();
+
+        spdlog::debug("latest tag: {} ({}), took: {}, {}, {}", latest_id, res.front().name, fetch, modify, insert);
     }
 }
