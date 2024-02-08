@@ -101,23 +101,51 @@ namespace database {
         connection& inst;
     };
 
-    class tags : table {
+    enum class tables {
+        tags,
+        posts,
+    };
+
+    template <tables Table>
+    class id_table : protected table {
         friend class connection;
 
         protected:
         using table::table;
 
         public:
-        [[nodiscard]] int32_t last();
+        ~id_table() override = default;
 
-        tags(const tags&) = delete;
-        tags& operator=(const tags&) = delete;
+        id_table(const id_table&) = delete;
+        id_table& operator=(const id_table&) = delete;
 
-        tags(tags&&) noexcept = default;
-        tags& operator=(tags&&) noexcept = default;
+        id_table(id_table&&) noexcept = default;
+        id_table& operator=(id_table&&) noexcept = default;
 
+        [[nodiscard]] int32_t latest_id();
+    };
+
+    class tags : public id_table<tables::tags> {
+        friend class connection;
+
+        protected:
+        using id_table::id_table;
+
+        public:
         int32_t insert(const danbooru::tag& tag);
         int32_t insert(std::span<const danbooru::tag> tag);
+
+        int32_t insert(pqxx::work& tx, const danbooru::tag& tag);
+        int32_t insert(pqxx::work& tx, std::span<const danbooru::tag> tag);
+    };
+
+    class posts : public id_table<tables::posts> {
+        friend class connection;
+
+        protected:
+        using id_table::id_table;
+
+        public:
     };
 
     class connection {
@@ -141,7 +169,16 @@ namespace database {
         [[nodiscard]] pqxx::work work();
 
         [[nodiscard]] tags tags();
+        [[nodiscard]] posts posts();
     };
+
+    template <tables Table>
+    int32_t id_table<Table>::latest_id() {
+        auto tx = inst.work();
+        int32_t res = tx.query_value<int32_t>(std::format("SELECT COALESCE(MAX(id), 0) FROM {}", magic_enum::enum_name<Table>()));
+        tx.commit();
+        return res;
+    }
 }
 
 #endif /* DATABASE_HPP */

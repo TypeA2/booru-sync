@@ -15,7 +15,7 @@ using namespace database;
 
 void tasks::fetch_tags::execute(std::stop_token token, api& booru, connection& db) {
     tags table = db.tags();
-    int32_t latest_id = table.last();
+    int32_t latest_id = table.latest_id();
 
     spdlog::info("Fetching from tag #{}", latest_id);
 

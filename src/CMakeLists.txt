@@ -9,7 +9,7 @@ add_executable(booru_sync
     "danbooru.hpp" "danbooru.cpp"
     "database.hpp" "database.cpp"
     "tasks/fetch_tags.hpp" "tasks/fetch_tags.cpp"
- )
+  "tasks/fetch_posts.cpp")
 
 setup_target(TARGET booru_sync LIBRARIES
     util

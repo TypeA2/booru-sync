@@ -12,17 +12,19 @@
 
 using namespace danbooru;
 
-tag tag::parse(json& json) {
-    return tag{
-        .id = json["id"],
-        .name = json["name"],
-        .post_count = json["post_count"],
-        .category = *magic_enum::enum_cast<tag_category>(json["category"].get<uint8_t>()),
+tag tag::parse(const json& json) {
+    return tag {
+        .id            = json["id"],
+        .name          = json["name"],
+        .post_count    = json["post_count"],
+        .category      = *magic_enum::enum_cast<tag_category>(json["category"].get<uint8_t>()),
         .is_deprecated = json["is_deprecated"],
-        .created_at = parse_timestamp(json["created_at"].get<std::string_view>()),
-        .updated_at = parse_timestamp(json["updated_at"].get<std::string_view>()),
+        .created_at    = parse_timestamp(json["created_at"].get<std::string_view>()),
+        .updated_at    = parse_timestamp(json["updated_at"].get<std::string_view>()),
     };
 }
+
+parameter::parameter(std::string key, json val) : key { key }, val { val } { }
 
 std::string page_selector::str() const {
     std::stringstream ss;
@@ -37,7 +39,19 @@ std::string page_selector::str() const {
     return ss.str();
 }
 
-cpr::Parameter page_selector::param() const {
+json page_selector::json() const {
+    return *this;
+}
+
+page_selector::operator danbooru::json() const {
+    return json::object({ { "page", str() } });
+}
+
+parameter page_selector::param() const {
+    return *this;
+}
+
+page_selector::operator parameter() const {
     return { "page", str() };
 }
 
@@ -82,7 +96,7 @@ api::api()
     spdlog::info("Rate limit: {} / s", _rl.bucket_size());
 
     /* Verify login */
-    auto res = get("profile", { "only", "id,name,level" }).get();
+    auto res = fetch("profile", json::object({ { "only", "id,name,level" } })).get();
 
     if (!res.contains("id") || !res.contains("name")) {
         throw std::runtime_error { std::format("Failed to get user info: {}", res.dump())};
@@ -103,12 +117,8 @@ std::future<std::vector<tag>> api::tags(page_selector page, size_t limit) {
         throw std::invalid_argument { std::format("limit of {} is too large (max: {})", limit, page_limit) };
     }
 
-    return get<std::vector<tag>>("tags", { page.param(), { "limit", std::to_string(limit) } },
+    return post<std::vector<tag>>("tags", { page, { "limit", std::to_string(limit) } },
         [](json response) -> std::vector<tag> {
             return response | std::views::transform(tag::parse) | std::ranges::to<std::vector>();
     });
-}
-
-std::future<json> api::get(std::string_view url, cpr::Parameter param) {
-    return get(url, cpr::Parameters { param });
 }

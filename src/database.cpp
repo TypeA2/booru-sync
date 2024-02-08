@@ -39,26 +39,31 @@ namespace pqxx {
 
 table::table(connection& inst) : inst { inst } { }
 
-int32_t tags::last() {
-    auto tx = inst.work();
-    int32_t res = tx.query_value<int32_t>("SELECT COALESCE(MAX(id), 0) FROM tags");
-    tx.commit();
-    return res;
-}
-
 int32_t tags::insert(const danbooru::tag& tag) {
     auto tx = inst.work();
-
-    tx.exec_prepared("tags_insert",
-        tag.id, tag.name, tag.post_count, tag.category, tag.is_deprecated, tag.created_at, tag.updated_at);
+    int32_t max_id = insert(tx, tag);
     tx.commit();
 
     return tag.id;
 }
 
 int32_t tags::insert(std::span<const danbooru::tag> tags) {
-    int32_t max_id = 0;
     auto tx = inst.work();
+    int32_t max_id = insert(tx, tags);
+    tx.commit();
+
+    return max_id;
+}
+
+int32_t tags::insert(pqxx::work& tx, const danbooru::tag& tag) {
+    tx.exec_prepared("tags_insert",
+        tag.id, tag.name, tag.post_count, tag.category, tag.is_deprecated, tag.created_at, tag.updated_at);
+
+    return tag.id;
+}
+
+int32_t tags::insert(pqxx::work& tx, std::span<const danbooru::tag> tags) {
+    int32_t max_id = 0;
 
     for (const danbooru::tag& tag : tags) {
         if (tag.id > max_id) {
@@ -68,8 +73,6 @@ int32_t tags::insert(std::span<const danbooru::tag> tags) {
         tx.exec_prepared("tags_insert",
             tag.id, tag.name, tag.post_count, tag.category, tag.is_deprecated, tag.created_at, tag.updated_at);
     }
-
-    tx.commit();
 
     return max_id;
 }
@@ -82,6 +85,7 @@ connection::connection() {
     spdlog::debug("Connected to {} as {}", _conn.dbname(), _conn.username());
 
     _conn.prepare("tags_insert", "INSERT INTO tags VALUES ($1, $2, $3, $4, $5, $6, $7)");
+    _conn.prepare("get_tag_id_by_name", "SELECT id FROM tags WHERE name = $1");
 }
 
 connection::~connection() {
@@ -104,4 +108,8 @@ pqxx::connection& connection::conn() {
 
 tags connection::tags() {
     return database::tags { *this };
+}
+
+posts connection::posts() {
+    return database::posts { *this };
 }
