@@ -62,6 +62,8 @@ namespace pqxx {
     DB_MAP_ENUM_TO_PSQL_ENUM(danbooru::post_rating);
     DB_MAP_ENUM_TO_PSQL_ENUM(danbooru::pool_category);
     DB_MAP_ENUM_TO_PSQL_ENUM(danbooru::user_level);
+    DB_MAP_ENUM_TO_PSQL_ENUM(danbooru::asset_status);
+    DB_MAP_ENUM_TO_PSQL_ENUM(danbooru::file_type);
 
     template <> inline constexpr std::string_view type_name<danbooru::timestamp> = "danbooru::timestamp";
     template <> inline constexpr bool is_unquoted_safe<danbooru::timestamp> = true;
@@ -104,6 +106,7 @@ namespace database {
     enum class tables {
         tags,
         posts,
+        media_assets,
     };
 
     template <tables Table>
@@ -146,6 +149,17 @@ namespace database {
         using id_table::id_table;
 
         public:
+        int32_t insert(pqxx::work& tx, const danbooru::post& post);
+    };
+
+    class media_assets : public id_table<tables::media_assets> {
+        friend class connection;
+
+        protected:
+        using id_table::id_table;
+
+        public:
+        int32_t insert(pqxx::work& tx, const danbooru::media_asset& asset);
     };
 
     class connection {
@@ -170,6 +184,7 @@ namespace database {
 
         [[nodiscard]] tags tags();
         [[nodiscard]] posts posts();
+        [[nodiscard]] media_assets media_assets();
     };
 
     template <tables Table>

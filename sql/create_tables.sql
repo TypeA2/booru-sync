@@ -6,7 +6,7 @@ BEGIN
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'post_rating') THEN
-        CREATE TYPE post_rating AS ENUM ('G', 'S', 'Q', 'E');
+        CREATE TYPE post_rating AS ENUM ('g', 's', 'q', 'e');
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'pool_category') THEN
@@ -17,13 +17,8 @@ BEGIN
         CREATE TYPE asset_status AS ENUM ('processing', 'active', 'deleted', 'expunged', 'failed');
     END IF;
 
-    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'asset_variant') THEN
-        CREATE TYPE asset_variant AS (
-            type     TEXT,
-            width    INTEGER,
-            height   INTEGER,
-            file_ext TEXT
-        );
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'file_type') THEN
+        CREATE TYPE file_type AS ENUM ('jpg', 'png', 'gif', 'webp', 'avif', 'mp4', 'webm', 'swf', 'zip');
     END IF;
 END$$;
 
@@ -58,16 +53,26 @@ CREATE TABLE IF NOT EXISTS tag_versions (
 CREATE TABLE IF NOT EXISTS media_assets (
     id           INTEGER         PRIMARY KEY,
     md5          TEXT            NOT NULL,
-    file_ext     TEXT            NOT NULL,
+    file_ext     file_type       NOT NULL,
     file_size    BIGINT          NOT NULL,
     image_width  INTEGER         NOT NULL,
+    image_height INTEGER         NOT NULL,
     duration     REAL,        -- Null for non-video
     pixel_hash   TEXT            NOT NULL,
     status       asset_status    NOT NULL,
+    file_key     TEXT            NOT NULL,
     is_public    BOOLEAN         NOT NULL,
-    variants     asset_variant[] NOT NULL,
     created_at   TIMESTAMP       NOT NULL,
     updated_at   TIMESTAMP       NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS media_asset_variants (
+    asset_id INTEGER   NOT NULL REFERENCES media_assets(id),
+    type     TEXT      NOT NULL,
+    width    INTEGER   NOT NULL,
+    height   INTEGER   NOT NULL,
+    file_ext file_type NOT NULL,
+    PRIMARY KEY (asset_id, type)
 );
 
 CREATE TABLE IF NOT EXISTS posts (
@@ -89,9 +94,9 @@ CREATE TABLE IF NOT EXISTS posts (
     is_banned    BOOLEAN     NOT NULL,
     pixiv_id     INTEGER, -- Null for non-Pixiv posts
     bit_flags    INTEGER     NOT NULL,
-    last_comment TIMESTAMP   NOT NULL,
-    last_bump    TIMESTAMP   NOT NULL,
-    last_note    TIMESTAMP   NOT NULL,
+    last_comment TIMESTAMP, -- Null when none
+    last_bump    TIMESTAMP,
+    last_note    TIMESTAMP,
     created_at   TIMESTAMP   NOT NULL,
     updated_at   TIMESTAMP   NOT NULL
 );
@@ -147,15 +152,15 @@ CREATE INDEX IF NOT EXISTS index_media_assets_on_pixel_hash ON media_assets USIN
 
 CREATE INDEX IF NOT EXISTS index_posts_on_approver_id ON posts USING btree (approver_id) WHERE (approver_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS index_posts_on_created_at ON posts USING btree (created_at);
-CREATE INDEX IF NOT EXISTS index_posts_on_is_deleted ON posts USING btree (is_deleted)  WHERE (is_deleted = true);
-CREATE INDEX IF NOT EXISTS index_posts_on_is_flagged ON posts USING btree (is_flagged)  WHERE (is_flagged = true);
-CREATE INDEX IF NOT EXISTS index_posts_on_is_pending ON posts USING btree (is_pending)  WHERE (is_pending = true);
+CREATE INDEX IF NOT EXISTS index_posts_on_is_deleted ON posts USING btree (is_deleted) WHERE (is_deleted = true);
+CREATE INDEX IF NOT EXISTS index_posts_on_is_flagged ON posts USING btree (is_flagged) WHERE (is_flagged = true);
+CREATE INDEX IF NOT EXISTS index_posts_on_is_pending ON posts USING btree (is_pending) WHERE (is_pending = true);
 CREATE INDEX IF NOT EXISTS index_posts_on_last_bump ON posts USING btree (last_bump DESC NULLS LAST);
 CREATE INDEX IF NOT EXISTS index_posts_on_last_note ON posts USING btree (last_note DESC NULLS LAST);
 CREATE UNIQUE INDEX IF NOT EXISTS index_posts_on_media_asset ON posts USING btree (media_asset);
-CREATE INDEX IF NOT EXISTS index_posts_on_parent_id ON posts USING btree (parent_id)   WHERE (parent_id IS NOT NULL);
-CREATE INDEX IF NOT EXISTS index_posts_on_pixiv_id ON posts USING btree (pixiv_id)    WHERE (pixiv_id IS NOT NULL);
-CREATE INDEX IF NOT EXISTS index_posts_on_rating ON posts USING btree (rating)      WHERE (rating != 'S'::post_rating);
+CREATE INDEX IF NOT EXISTS index_posts_on_parent_id ON posts USING btree (parent_id) WHERE (parent_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS index_posts_on_pixiv_id ON posts USING btree (pixiv_id) WHERE (pixiv_id IS NOT NULL);
+CREATE INDEX IF NOT EXISTS index_posts_on_rating ON posts USING btree (rating) WHERE (rating != 's'::post_rating);
 CREATE INDEX IF NOT EXISTS index_posts_on_uploader_id ON posts USING btree (uploader_id) WHERE (uploader_id IS NOT NULL);
 CREATE INDEX IF NOT EXISTS index_posts_on_uploader_id_and_created_at ON public.posts USING btree (uploader_id, created_at);
 

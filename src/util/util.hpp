@@ -13,6 +13,7 @@
 #include <chrono>
 
 #include <fmt/format.h>
+#include <nlohmann/json.hpp>
 
 namespace util {
     namespace detail {
@@ -84,6 +85,15 @@ namespace util {
             start = clock::now();
         }
     };
+
+    template <typename T>
+    auto value_or(const nlohmann::json& v, T def) {
+        if (v.is_null()) {
+            return def;
+        } else {
+            return v.get<T>();
+        }
+    }
 }
 
 template <> struct std::formatter<std::chrono::nanoseconds> {

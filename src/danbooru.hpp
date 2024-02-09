@@ -51,6 +51,26 @@ namespace danbooru {
         owner       = 60,
     };
 
+    enum class asset_status : uint8_t {
+        processing,
+        active,
+        deleted,
+        expunged,
+        failed,
+    };
+
+    enum class file_type : uint8_t {
+        jpg,
+        png,
+        gif,
+        webp,
+        avif,
+        mp4,
+        webm,
+        swf,
+        zip,
+    };
+
     struct tag {
         int32_t id;
         std::string name;
@@ -71,7 +91,6 @@ namespace danbooru {
         post_rating rating;
         int32_t parent;
         std::string source;
-        std::array<char, 32> md5;
         int32_t media_asset;
         int32_t fav_count;
         bool has_children;
@@ -86,15 +105,36 @@ namespace danbooru {
         timestamp last_comment;
         timestamp last_bump;
         timestamp last_note;
-        timestamp created_ad;
+        timestamp created_at;
         timestamp updated_at;
     };
 
-    struct parameter {
-        std::string key;
-        json val;
+    struct media_asset_variant {
+        std::string type;
+        int32_t width;
+        int32_t height;
+        file_type file_ext;
 
-        parameter(std::string key, json val);
+        [[nodiscard]] static media_asset_variant parse(const json& src);
+    };
+
+    struct media_asset {
+        int32_t id;
+        std::string md5;
+        file_type file_ext;
+        int64_t file_size;
+        int32_t image_width;
+        int32_t image_height;
+        float duration;
+        std::string pixel_hash;
+        asset_status status;
+        std::string file_key;
+        bool is_public;
+        std::vector<media_asset_variant> variants;
+        timestamp created_at;
+        timestamp updated_at;
+
+        [[nodiscard]] static media_asset parse(const json& src);
     };
 
     enum class request_type {
@@ -118,9 +158,6 @@ namespace danbooru {
         [[nodiscard]] json json() const;
         operator danbooru::json() const;
 
-        [[nodiscard]] parameter param() const;
-        operator parameter() const;
-
         [[nodiscard]] static page_selector at(uint32_t value);
         [[nodiscard]] static page_selector before(uint32_t value);
         [[nodiscard]] static page_selector after(uint32_t value);
@@ -130,6 +167,7 @@ namespace danbooru {
     static constexpr size_t timestamp_length = 30;
 
     [[nodiscard]] timestamp parse_timestamp(std::string_view ts);
+    [[nodiscard]] timestamp nullable_timestamp(const json& src);
     [[nodiscard]] std::string format_timestamp(timestamp time);
 
     template <typename T, typename Func>
@@ -194,8 +232,9 @@ namespace danbooru {
                         });
                     }
 
-                    //spdlog::trace("Body:\n{}", params.dump());
-                    ses->SetBody(params.dump());
+                    std::string body = params.dump();
+                    // spdlog::trace("Body: {}", body);
+                    ses->SetBody(body);
                 }
 
                 _rl.acquire();

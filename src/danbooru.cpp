@@ -24,7 +24,33 @@ tag tag::parse(const json& json) {
     };
 }
 
-parameter::parameter(std::string key, json val) : key { key }, val { val } { }
+media_asset_variant media_asset_variant::parse(const json& src) {
+    return media_asset_variant {
+        .type     = src["type"],
+        .width    = src["width"],
+        .height   = src["height"],
+        .file_ext = *magic_enum::enum_cast<file_type>(src["file_ext"].get<std::string_view>()),
+    };
+}
+
+media_asset media_asset::parse(const json& src) {
+    return media_asset {
+        .id           = src["id"],
+        .md5          = src["md5"],
+        .file_ext     = *magic_enum::enum_cast<file_type>(src["file_ext"].get<std::string_view>()),
+        .file_size    = src["file_size"],
+        .image_width  = src["image_width"],
+        .image_height = src["image_height"],
+        .duration     = util::value_or<float>(src["duration"], 0),
+        .pixel_hash   = src["pixel_hash"],
+        .status       = *magic_enum::enum_cast<asset_status>(src["status"].get<std::string_view>()),
+        .file_key     = src["file_key"],
+        .is_public    = src["is_public"],
+        .variants     = src["variants"] | std::views::transform(&media_asset_variant::parse) | std::ranges::to<std::vector>(),
+        .created_at   = parse_timestamp(src["created_at"]),
+        .updated_at   = parse_timestamp(src["updated_at"]),
+    };
+}
 
 std::string page_selector::str() const {
     std::stringstream ss;
@@ -47,14 +73,6 @@ page_selector::operator danbooru::json() const {
     return json::object({ { "page", str() } });
 }
 
-parameter page_selector::param() const {
-    return *this;
-}
-
-page_selector::operator parameter() const {
-    return { "page", str() };
-}
-
 page_selector page_selector::at(uint32_t value) {
     return { .pos = page_pos::absolute, .value = value };
 }
@@ -75,6 +93,14 @@ timestamp danbooru::parse_timestamp(std::string_view ts) {
     ss >> std::chrono::parse("%FT%T%Ez", res);
 
     return res;
+}
+
+timestamp danbooru::nullable_timestamp(const json& src) {
+    if (src.is_null()) {
+        return {};
+    } else {
+        return parse_timestamp(src);
+    }
 }
 
 std::string danbooru::format_timestamp(timestamp time) {
