@@ -15,7 +15,6 @@
 #include "danbooru.hpp"
 #include "database.hpp"
 
-#include "tasks/fetch_tags.hpp"
 #include "tasks/fetch_posts.hpp"
 
 static std::atomic_flag signal_flag = ATOMIC_FLAG_INIT;
@@ -62,7 +61,7 @@ int main(int argc, char** argv) {
 
         std::array<std::unique_ptr<perpetual_task>, 1> tasks {
             std::make_unique<tasks::fetch_posts>(
-                "fetch_tags", std::chrono::minutes(5), perpetual_task::timing_mode::per_invocation,
+                "fetch_posts", std::chrono::minutes(5), perpetual_task::timing_mode::per_invocation,
                 booru, database::connection {}
             ),
         };

@@ -15,7 +15,7 @@
 #undef __cpp_lib_source_location
 #include <pqxx/pqxx>
 
-#include "danbooru.hpp"
+#include "danbooru_defs.hpp"
 
 namespace detail {
     template <typename T> requires std::is_enum_v<T>
@@ -83,85 +83,13 @@ namespace pqxx {
 }
 
 namespace database {
-    class connection;
+    enum class insert_mode {
+        /* Discard on conflict */
+        weak,
 
-    class table {
-        friend class connection;
-
-        public:
-        virtual ~table() = default;
-
-        table(const table&) = delete;
-        table& operator=(const table&) = delete;
-
-        table(table&&) noexcept = default;
-        table& operator=(table&&) noexcept = default;
-
-        protected:
-        explicit table(connection& inst);
-
-        connection& inst;
+        /* Overwrite on conflict */
+        overwrite,
     };
-
-    enum class tables {
-        tags,
-        posts,
-        media_assets,
-    };
-
-    template <tables Table>
-    class id_table : protected table {
-        friend class connection;
-
-        protected:
-        using table::table;
-
-        public:
-        ~id_table() override = default;
-
-        id_table(const id_table&) = delete;
-        id_table& operator=(const id_table&) = delete;
-
-        id_table(id_table&&) noexcept = default;
-        id_table& operator=(id_table&&) noexcept = default;
-
-        [[nodiscard]] int32_t latest_id();
-    };
-
-    class tags : public id_table<tables::tags> {
-        friend class connection;
-
-        protected:
-        using id_table::id_table;
-
-        public:
-        int32_t insert(const danbooru::tag& tag);
-        int32_t insert(std::span<const danbooru::tag> tag);
-
-        int32_t insert(pqxx::work& tx, const danbooru::tag& tag);
-        int32_t insert(pqxx::work& tx, std::span<const danbooru::tag> tag);
-    };
-
-    class posts : public id_table<tables::posts> {
-        friend class connection;
-
-        protected:
-        using id_table::id_table;
-
-        public:
-        int32_t insert(pqxx::work& tx, const danbooru::post& post);
-    };
-
-    class media_assets : public id_table<tables::media_assets> {
-        friend class connection;
-
-        protected:
-        using id_table::id_table;
-
-        public:
-        int32_t insert(pqxx::work& tx, const danbooru::media_asset& asset);
-    };
-
     class connection {
         pqxx::connection _conn;
 
@@ -182,18 +110,29 @@ namespace database {
 
         [[nodiscard]] pqxx::work work();
 
-        [[nodiscard]] tags tags();
-        [[nodiscard]] posts posts();
-        [[nodiscard]] media_assets media_assets();
-    };
+        int32_t insert(pqxx::work& tx, const danbooru::tag& tag, insert_mode mode);
+        int32_t insert(pqxx::work& tx, const danbooru::post& post);
+        int32_t insert(pqxx::work& tx, const danbooru::media_asset& asset);
+        int32_t insert(pqxx::work& tx, const danbooru::post_version& version);
 
-    template <tables Table>
-    int32_t id_table<Table>::latest_id() {
-        auto tx = inst.work();
-        int32_t res = tx.query_value<int32_t>(std::format("SELECT COALESCE(MAX(id), 0) FROM {}", magic_enum::enum_name<Table>()));
-        tx.commit();
-        return res;
-    }
+        void increment_post_count(pqxx::work& tx, int32_t tag_id, int32_t count = 1);
+
+        [[nodiscard]] int32_t latest_post();
+        [[nodiscard]] int32_t latest_tag();
+        [[nodiscard]] int32_t latest_media_asset();
+        [[nodiscard]] int32_t latest_post_version();
+        [[nodiscard]] int32_t latest_post_version(int32_t post_id);
+
+        /* Lowest tag ID, used for tags without a tag ID on the site */
+        [[nodiscard]] int32_t lowest_tag();
+        [[nodiscard]] int32_t lowest_tag(pqxx::work& tx);
+
+        [[nodiscard]] int32_t tag_id(pqxx::work& tx, std::string_view tag_name);
+
+        private:
+        [[nodiscard]] int32_t _table_max_id(std::string_view table);
+        [[nodiscard]] int32_t _table_max_id(pqxx::work& tx, std::string_view table);
+    };
 }
 
 #endif /* DATABASE_HPP */

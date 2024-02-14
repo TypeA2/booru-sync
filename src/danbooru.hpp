@@ -7,148 +7,13 @@
 #include <magic_enum.hpp>
 
 #include <logging.hpp>
-
+#include <util.hpp>
 #include <rate_limit.hpp>
 
+#include "danbooru_defs.hpp"
+#include "database.hpp"
+
 namespace danbooru {
-    using json = nlohmann::json;
-
-    static constexpr size_t post_limit = 200;
-    static constexpr size_t page_limit = 1000;
-    using timestamp = std::chrono::utc_clock::time_point;
-
-    enum class tag_category : uint8_t {
-        general = 0,
-        artist = 1,
-        copyright = 3,
-        character = 4,
-        meta = 5,
-    };
-
-    enum class post_rating : uint8_t {
-        g,
-        s,
-        q,
-        e,
-    };
-
-    enum class pool_category : uint8_t {
-        series,
-        collection,
-    };
-
-    enum class user_level : uint8_t {
-        anonymous   =  0,
-        restricted  = 10,
-        member      = 20,
-        gold        = 30,
-        platinum    = 31,
-        builder     = 32,
-        contributor = 35,
-        approver    = 37,
-        moderator   = 40,
-        admin       = 50,
-        owner       = 60,
-    };
-
-    enum class asset_status : uint8_t {
-        processing,
-        active,
-        deleted,
-        expunged,
-        failed,
-    };
-
-    enum class file_type : uint8_t {
-        jpg,
-        png,
-        gif,
-        webp,
-        avif,
-        mp4,
-        webm,
-        swf,
-        zip,
-    };
-
-    struct tag {
-        int32_t id;
-        std::string name;
-        int32_t post_count;
-        tag_category category;
-        bool is_deprecated;
-        timestamp created_at;
-        timestamp updated_at;
-
-        [[nodiscard]] static tag parse(const json& json);
-    };
-
-    struct post {
-        int32_t id;
-        int32_t uploader_id;
-        int32_t approver_id;
-        std::vector<int32_t> tags;
-        post_rating rating;
-        int32_t parent;
-        std::string source;
-        int32_t media_asset;
-        int32_t fav_count;
-        bool has_children;
-        int32_t up_score;
-        int32_t down_score;
-        bool is_pending;
-        bool is_flagged;
-        bool is_deleted;
-        bool is_banned;
-        int32_t pixiv_id;
-        int32_t bit_flags;
-        timestamp last_comment;
-        timestamp last_bump;
-        timestamp last_note;
-        timestamp created_at;
-        timestamp updated_at;
-    };
-
-    struct media_asset_variant {
-        std::string type;
-        int32_t width;
-        int32_t height;
-        file_type file_ext;
-
-        [[nodiscard]] static media_asset_variant parse(const json& src);
-    };
-
-    struct media_asset {
-        int32_t id;
-        std::string md5;
-        file_type file_ext;
-        int64_t file_size;
-        int32_t image_width;
-        int32_t image_height;
-        float duration;
-        std::string pixel_hash;
-        asset_status status;
-        std::string file_key;
-        bool is_public;
-        std::vector<media_asset_variant> variants;
-        timestamp created_at;
-        timestamp updated_at;
-
-        [[nodiscard]] static media_asset parse(const json& src);
-    };
-
-    enum class request_type {
-        get,
-        post,
-        get_as_post,
-    };
-
-    enum class page_pos {
-        absolute,
-        before,
-        after,
-    };
-
     struct page_selector {
         page_pos pos;
         uint32_t value;
@@ -162,13 +27,6 @@ namespace danbooru {
         [[nodiscard]] static page_selector before(uint32_t value);
         [[nodiscard]] static page_selector after(uint32_t value);
     };
-
-    static constexpr char timestamp_format[] = "{:%FT%T%Ez}";
-    static constexpr size_t timestamp_length = 30;
-
-    [[nodiscard]] timestamp parse_timestamp(std::string_view ts);
-    [[nodiscard]] timestamp nullable_timestamp(const json& src);
-    [[nodiscard]] std::string format_timestamp(timestamp time);
 
     template <typename T, typename Func>
     concept transform_func = requires (Func func, json args) {
@@ -208,57 +66,105 @@ namespace danbooru {
         template <request_type Req, typename T = json, typename Func = std::identity> requires transform_func<T, Func>
         [[nodiscard]] std::future<T> request(std::string_view url, json params = {}, Func&& func = {}) {
             return std::async([this](const cpr::Url& url, json params, Func func) -> T {
-                auto ses = std::make_shared<cpr::Session>();
-                ses->SetAuth(_auth);
-                ses->SetUrl(url);
-                ses->SetUserAgent(_user_agent);
+                static std::array backoff { 100, 250, 250, 500, 500, 500, 1000, 1000, 1000, 1000 };
 
-                if constexpr (Req == request_type::get) {
-                    cpr::Parameters res;
-                    for (auto& [key, val] : params) {
-                        res.Add(cpr::Parameter { key, val });
-                    }
+                for (int32_t delay : backoff) {
+                    auto ses = std::make_shared<cpr::Session>();
+                    ses->SetAuth(_auth);
+                    ses->SetUrl(url);
+                    ses->SetUserAgent(_user_agent);
 
-                    ses->SetParameters(res);
-                } else {
-                    if constexpr (Req == request_type::get_as_post) {
-                        ses->SetHeader(cpr::Header {
-                            { "Content-Type", "application/json" },
-                            { "X-HTTP-Method-Override", "get" }
-                            });
+                    if constexpr (Req == request_type::get) {
+                        cpr::Parameters res;
+                        for (auto& [key, val] : params) {
+                            res.Add(cpr::Parameter { key, val });
+                        }
+
+                        ses->SetParameters(res);
                     } else {
-                        ses->SetHeader(cpr::Header {
-                            { "Content-Type", "application/json" }
-                        });
+                        if constexpr (Req == request_type::get_as_post) {
+                            ses->SetHeader(cpr::Header {
+                                { "Content-Type", "application/json" },
+                                { "X-HTTP-Method-Override", "get" }
+                                });
+                        } else {
+                            ses->SetHeader(cpr::Header {
+                                { "Content-Type", "application/json" }
+                                });
+                        }
+
+                        std::string body = params.dump();
+                        // spdlog::trace("Body: {}", body);
+                        ses->SetBody(body);
                     }
 
-                    std::string body = params.dump();
-                    // spdlog::trace("Body: {}", body);
-                    ses->SetBody(body);
+                    _rl.acquire();
+
+                    cpr::Response res;
+
+                    auto begin = clock::now();
+
+                    if constexpr (Req == request_type::get) {
+                        res = ses->Get();
+                    } else {
+                        res = ses->Post();
+                    }
+
+                    std::chrono::nanoseconds elapsed = clock::now() - begin;
+
+                    spdlog::trace("{}: {} - {} ({})",
+                        magic_enum::enum_name<Req>(),
+                        res.status_code,
+                        ses->GetFullRequestUrl(),
+                        elapsed
+                    );
+
+                    if (res.status_code == 0) {
+                        spdlog::warn("cURL error {}", magic_enum::enum_name(res.error.code));
+                        spdlog::warn("{} - {} ({})", magic_enum::enum_name<Req>(), ses->GetFullRequestUrl(), elapsed);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+                        continue;
+                    }
+
+                    if (res.status_code >= 400) {
+                        throw std::runtime_error {
+                            std::format("{}: {} - {}\n{}", magic_enum::enum_name<Req>(), res.status_code, ses->GetFullRequestUrl(), res.text)
+                        };
+                    }
+
+                    try {
+                        json j = json::parse(res.text);
+                        return func(std::move(j));
+                    } catch (const nlohmann::json::exception& e) {
+                        spdlog::error("JSON exception: {}", e.what());
+                        spdlog::error("{}: {} - {}", magic_enum::enum_name<Req>(), res.status_code, ses->GetFullRequestUrl());
+                        if (res.error) {
+                            spdlog::error("cURL error {} {}",
+                                magic_enum::enum_name(res.error.code),
+                                res.error.message.empty() ? "" : "- " + res.error.message);
+                        }
+
+                        if constexpr (Req == request_type::get) {
+                            spdlog::error("Parameters:");
+                            for (const auto& [key, val] : params) {
+                                spdlog::error("    {} = {}", key, val);
+                            }
+                        } else {
+                            spdlog::error("Body: {}", params.dump(4));
+                        }
+
+                        throw;
+                    }
                 }
 
-                _rl.acquire();
-
-                cpr::Response res;
-
-                if constexpr (Req == request_type::get) {
-                    res = ses->Get();
-                } else {
-                    res = ses->Post();
-                }
-
-                spdlog::trace("{}: {} - {}", magic_enum::enum_name<Req>(), res.status_code, ses->GetFullRequestUrl());
-
-                if (res.status_code >= 400) {
-                    throw std::runtime_error {
-                        std::format("{}: {} - {}\n{}", magic_enum::enum_name<Req>(), res.status_code, ses->GetFullRequestUrl(), res.text)
-                    };
-                }
-
-                return func(json::parse(res.text));
+                throw std::runtime_error { std::format("Failed to fetch after {} tries, aborting", backoff.size()) };
             }, std::format("https://danbooru.donmai.us/{}.json", url), std::move(params), std::forward<Func>(func));
         }
     };
+
+    /* Fetch tag IDs and insert them into the databse */
+    [[nodiscard]] std::future<util::unordered_string_map<int32_t>> fetch_and_insert_tags(
+        api& booru, database::connection& db, const util::unordered_string_set& tags, database::insert_mode mode);
 }
 
 #endif /* DANBOORU_HPP */

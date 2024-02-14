@@ -7,9 +7,9 @@ add_executable(booru_sync
     "booru_sync.cpp"
     "perpetual_task.hpp" "perpetual_task.cpp"
     "danbooru.hpp" "danbooru.cpp"
-    "database.hpp" "database.cpp"
-    "tasks/fetch_tags.hpp" "tasks/fetch_tags.cpp"
-  "tasks/fetch_posts.cpp")
+    "database.hpp" "danbooru_defs.hpp" "database.cpp"
+    "tasks/fetch_posts.hpp" "tasks/fetch_posts.cpp"
+)
 
 setup_target(TARGET booru_sync LIBRARIES
     util
@@ -20,5 +20,7 @@ setup_target(TARGET booru_sync LIBRARIES
     nlohmann_json::nlohmann_json
     spdlog::spdlog
 )
+
+target_compile_definitions(booru_sync PRIVATE JSON_DISABLE_ENUM_SERIALIZATION=1)
 
 target_include_directories(booru_sync PRIVATE ".")

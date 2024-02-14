@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS tags (
 
 CREATE TABLE IF NOT EXISTS tag_versions (
     id                  INTEGER      PRIMARY KEY,
-    tag_id              INTEGER      REFERENCES tags(id),
+    tag_id              INTEGER,
     name                TEXT         NOT NULL,
     updater_id          INTEGER,  -- Null on first change/tag creation
     previous_version_id INTEGER      REFERENCES tag_versions(id), -- Null when first version
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS posts (
     rating       post_rating NOT NULL,
     parent_id    INTEGER, -- Null for parent-less
     source       TEXT,    -- Null for empty source (should save space)
-    media_asset  INTEGER     NOT NULL REFERENCES media_assets(id),
+    media_asset  INTEGER     NOT NULL,
     fav_count    INTEGER     NOT NULL,
     has_children BOOLEAN     NOT NULL,
     up_score     INTEGER     NOT NULL,
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS posts (
 
 CREATE TABLE IF NOT EXISTS post_versions (
     id           INTEGER   PRIMARY KEY,
-    post_id      INTEGER   NOT NULL REFERENCES posts(id),
+    post_id      INTEGER   NOT NULL,
     updater_id   INTEGER   NOT NULL,
     updated_at   TIMESTAMP NOT NULL,
     version      INTEGER   NOT NULL, -- Not unique, some duplicate versions exist
@@ -120,7 +120,7 @@ CREATE TABLE IF NOT EXISTS comments (
     id         INTEGER   PRIMARY KEY,
     created_at TIMESTAMP NOT NULL,
     updated_at TIMESTAMP NOT NULL,
-    post_id    INTEGER   NOT NULL REFERENCES posts(id),
+    post_id    INTEGER   NOT NULL,
     creator_id INTEGER   NOT NULL,
     body       TEXT      NOT NULL,
     score      INTEGER   NOT NULL,

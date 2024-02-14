@@ -11,9 +11,27 @@
 #include <memory>
 #include <format>
 #include <chrono>
+#include <type_traits>
 
 #include <fmt/format.h>
 #include <nlohmann/json.hpp>
+#include <magic_enum.hpp>
+
+#define JSON_SERIALIZE_STRING_ENUM(E) \
+    inline void to_json(json& dst, E val) { \
+        dst = magic_enum::enum_integer(val); \
+    } \
+    inline void from_json(const json& src, E& val) { \
+        val = *magic_enum::enum_cast<E>(src.get<std::string_view>()); \
+    }
+
+#define JSON_SERIALIZE_INT_ENUM(E) \
+    inline void to_json(json& dst, E val) { \
+        dst = magic_enum::enum_name(val); \
+    } \
+    inline void from_json(const json& src, E& val) { \
+        val = *magic_enum::enum_cast<E>(src.get<std::underlying_type_t<E>>()); \
+    }
 
 namespace util {
     namespace detail {

@@ -27,6 +27,11 @@ void perpetual_task::start() {
                 auto end = clock::now();
                 auto elapsed = end - begin;
 
+                /* Exit immediately if stop requested */
+                if (token.stop_requested()) {
+                    break;
+                }
+
                 /* Adjust target wake time */
                 auto next_wake = end + _interval;
                 if (_mode == timing_mode::per_invocation) {
